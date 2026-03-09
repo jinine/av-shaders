@@ -10,5 +10,7 @@ Python 3+
     - powershell: `.\\venv\\Scripts\\Activate.ps1`
 3. install dependencies 
     - `pip install -r requirements.txt`
-4. run desired shader 
+4. add desired tracks into a folder named 'audio' in project root
+    - .wav, .mp3 supported
+5. run desired shader 
     - `python [shader-name].py`
