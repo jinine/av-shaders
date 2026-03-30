@@ -5,7 +5,7 @@ import random
 import cv2
 import librosa
 import moderngl
-from moviepy import *
+from moviepy import VideoFileClip, concatenate_videoclips, AudioFileClip
 import numpy as np
 import pygame
 
@@ -434,7 +434,7 @@ void main() {
 """
 
 
-def create_chopped_video(video_files: list[Path], beat_times: np.ndarray, output_path: str):
+def create_chopped_video(video_files: list[Path], beat_times: np.ndarray, output_path: str, audio_source: Path = None):
     if not video_files:
         return False
 
@@ -450,7 +450,7 @@ def create_chopped_video(video_files: list[Path], beat_times: np.ndarray, output
     if not clips:
         return False
 
-    concatenated = concatenate_videoclips(clips)
+    concatenated = concatenate_videoclips(clips).without_audio()
 
     if len(beat_times) <= 1:
         chopped = concatenated
@@ -469,8 +469,20 @@ def create_chopped_video(video_files: list[Path], beat_times: np.ndarray, output
         else:
             chopped = concatenated
 
-    # MoviePy v2 changed write_videofile signature: drop verbose/logger kwargs
-    chopped.write_videofile(output_path, fps=30, audio=False)
+    if audio_source is not None and audio_source.exists():
+        try:
+            audio_clip = AudioFileClip(str(audio_source))
+            print(f"Audio source: {audio_source}, duration {audio_clip.duration:.2f}s, chopped duration {chopped.duration:.2f}s")
+            audio_clip = audio_clip.subclip(0, min(audio_clip.duration, chopped.duration))
+            chopped = chopped.without_audio().set_audio(audio_clip)
+            print(f"Attached audio duration = {chopped.audio.duration:.2f}s")
+        except Exception as e:
+            print(f"Error attaching audio {audio_source}: {e}")
+    else:
+        print("No audio source found; output will be silent")
+
+    # Ensure audio from selected music path is embedded; use common codecs
+    chopped.write_videofile(output_path, fps=30, audio=True, codec='libx264', audio_codec='aac', audio_bitrate='192k')
     print(f"Chopped video saved to {output_path}")
     return True
 
@@ -527,9 +539,9 @@ def main():
     current_audio = audio_files[current_index]
     features = analyze_audio(current_audio)
 
-    chopped_path = "chopped_video.mp4"
+    chopped_path = "chopped_video_file.mp4"
     if video_files:
-        create_chopped_video(video_files, features["beat_times"], chopped_path)
+        create_chopped_video(video_files, features["beat_times"], chopped_path, current_audio)
 
     cap = cv2.VideoCapture(chopped_path) if video_files else None
 
